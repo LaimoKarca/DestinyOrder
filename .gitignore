@@ -1,0 +1,85 @@
+# ==============================================================================
+# DestinyOrder Git Ignore Rules
+# ==============================================================================
+
+# --- 1. 環境變數、機密與憑證（僅保留 .env.example 範本） ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.der
+
+# --- 2. 個人開發筆記、AI 代理紀錄與舊私有部署手冊 ---
+memory/
+CLAUDE.md
+.claude/
+.vscode/
+frontend/.vscode/
+.idea/
+部署手冊.md
+.recovery/
+
+# --- 3. 本機爬蟲資料、暫存副本與封存備份檔（不含於公開版本庫） ---
+backend/data/
+COPY/
+destinyorder-images.tar
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.7z
+*.bak
+backups/
+backup/
+
+# --- 4. 權利待確認或已停用之靜態資產、離線生成腳本與舊廣告元件 ---
+frontend/public/audio/
+frontend/public/og-image.png
+frontend/public/ads.txt
+frontend/public/favicon.ico
+frontend/public/favicon-*.png
+frontend/public/apple-touch-icon.png
+frontend/src/components/BottomAdSlot.vue
+frontend/src/components/SideAdSlots.vue
+scripts/generate_favicon.py
+scripts/render_lottery_sfx.py
+
+# --- 5. Python 虛擬環境與快取 ---
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- 6. Node.js / Vite / 測試與預渲染建置產物 ---
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/coverage/
+*.log
+npm-debug.log*
+.eslintcache
+*.tsbuildinfo
+.vite/
+test-results/
+frontend/test-results/
+playwright-report/
+frontend/playwright-report/
+blob-report/
+frontend/blob-report/
+.playwright-cli/
+frontend/.playwright-cli/
+__screenshots__/
+
+# --- 7. 作業系統暫存檔 ---
+.DS_Store
+Thumbs.db

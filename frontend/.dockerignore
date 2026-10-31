@@ -1,0 +1,59 @@
+# 環境變數、機密與憑證（僅允許已清洗之 .env.example）
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.crt
+*.der
+
+# Node 產物與快取
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.log
+.eslintcache
+*.tsbuildinfo
+.vite/
+
+# 測試產物
+test-results/
+playwright-report/
+blob-report/
+.playwright-cli/
+__screenshots__/
+e2e/
+
+# 權利未確認之本機靜態資產与已停用廣告元件（不打包進容器）
+public/audio/
+public/og-image.png
+public/ads.txt
+public/favicon.ico
+public/favicon-*.png
+public/apple-touch-icon.png
+src/components/BottomAdSlot.vue
+src/components/SideAdSlots.vue
+
+# 編輯器 / 代理 / 本機設定與備份
+.claude/
+.vscode/
+.idea/
+.recovery/
+memory/
+CLAUDE.md
+部署手冊.md
+.DS_Store
+Thumbs.db
+
+# 文件
+docs/
+README.md
+
+# Docker 與版本控制
+Dockerfile
+.dockerignore
+.git/
+.gitignore

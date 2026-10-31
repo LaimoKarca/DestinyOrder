@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Generated dynamically at build time from VITE_SITE_URL (see vite.config.ts)
+Sitemap: http://127.0.0.1:5173/sitemap.xml

@@ -1,0 +1,114 @@
+# DestinyOrder 部署堆疊
+#
+# 預設啟動服務（`docker compose up -d`）：
+#   backend-api        FastAPI（uvicorn）對外服務 /api/*
+#   frontend           Nginx 靜態檔 + /api/ 反向代理至 backend-api
+#
+# 選用 Profile 服務（預設不啟動，需顯式指定 `--profile`）：
+#   backend-scheduler  每日多時刻觸發股價爬蟲（profile: crawler）
+#   backend-twse       TWSE 證券清單爬蟲（profile: crawler）
+#   cloudflared        Cloudflare Tunnel（profile: tunnel；token 從環境變數取得）
+#
+# 啟動方式：
+#   1) 僅啟動 Web + API（預設）：
+#      docker compose up -d
+#   2) 額外啟動背景爬蟲（請先確認資料來源網站服務條款）：
+#      docker compose --profile crawler up -d
+#   3) 額外啟動 Cloudflare Tunnel（需先於 .env 設定 CLOUDFLARED_TOKEN）：
+#      docker compose --profile tunnel up -d
+
+x-backend-common: &backend-common
+  image: destinyorder-backend:latest
+  build:
+    context: ./backend
+  environment:
+    TZ: Asia/Taipei
+    PYTHONUNBUFFERED: "1"
+  volumes:
+    - funds_data:/app/backend/data
+  restart: always
+  networks:
+    - destinyorder
+
+services:
+  # 1. 後端 API
+  backend-api:
+    <<: *backend-common
+    container_name: destinyorder-backend-api
+    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # 2. 每日股價爬蟲排程器（選用 profile: crawler，預設不啟動）
+  backend-scheduler:
+    <<: *backend-common
+    profiles: ["crawler"]
+    container_name: destinyorder-backend-scheduler
+    command: ["python", "-m", "backend.run_scheduler"]
+    # 排程器不需要對外開 port；健康狀態以容器存活為準
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f run_scheduler >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  # 3. TWSE 有價證券清單爬蟲（選用 profile: crawler，預設不啟動）
+  backend-twse:
+    <<: *backend-common
+    profiles: ["crawler"]
+    container_name: destinyorder-backend-twse
+    command: ["python", "-m", "backend.run_twse_securities"]
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f run_twse_securities >/dev/null || exit 1"]
+      interval: 60s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+
+  # 4. 前端 / Nginx 反向代理
+  frontend:
+    container_name: destinyorder-frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_SITE_URL: ${VITE_SITE_URL:-http://127.0.0.1:5173}
+    image: destinyorder-frontend:latest
+    environment:
+      TZ: Asia/Taipei
+    ports:
+      - "80:80"
+    depends_on:
+      backend-api:
+        condition: service_healthy
+    restart: always
+    networks:
+      - destinyorder
+
+  # 5. Cloudflare Tunnel（選用 profile: tunnel，預設不啟動）
+  cloudflared:
+    profiles: ["tunnel"]
+    container_name: destinyorder-cloudflared
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARED_TOKEN:-}
+    environment:
+      TZ: Asia/Taipei
+    restart: always
+    depends_on:
+      - frontend
+    networks:
+      - destinyorder
+
+volumes:
+  funds_data:
+    driver: local
+
+networks:
+  destinyorder:
+    driver: bridge

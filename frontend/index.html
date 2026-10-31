@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#070a1a">
+
+    <!-- SEO -->
+    <title>DestinyOrder · 台股 ETF 命定抽抽樂｜成分股隨機抽選與權重查詢</title>
+    <meta name="description" content="今天不知道要研究哪一檔？一鍵從 0050、006208、009816、00403A、00981A 等熱門 ETF 隨機抽選成分股，並查詢各檔權重佔比與產業分類。">
+    <meta name="author" content="DestinyOrder">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="__SITE_URL__/">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="DestinyOrder">
+    <meta property="og:locale" content="zh_TW">
+    <meta property="og:url" content="__SITE_URL__/">
+    <meta property="og:title" content="DestinyOrder · 台股 ETF 命定抽抽樂｜成分股隨機抽選與權重查詢">
+    <meta property="og:description" content="今天不知道要研究哪檔？交給命定抽抽樂！一鍵隨機抽出熱門台股 ETF 成分股，並查詢各檔的 ETF 權重與產業分類。">
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="DestinyOrder · 台股 ETF 命定抽抽樂">
+    <meta name="twitter:description" content="今天不知道要研究哪檔？交給命定抽抽樂！一鍵隨機抽出熱門台股 ETF 成分股。">
+
+    <!-- 結構化資料：WebSite + 站內導覽 -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "__SITE_URL__/#website",
+          "url": "__SITE_URL__/",
+          "name": "DestinyOrder",
+          "description": "台股 ETF 命定抽抽樂與成分股 / 權重查詢工具",
+          "inLanguage": "zh-Hant"
+        },
+        {
+          "@type": "WebApplication",
+          "@id": "__SITE_URL__/#app",
+          "name": "DestinyOrder",
+          "alternateName": "命定抽抽樂",
+          "url": "__SITE_URL__/",
+          "description": "從熱門台股 ETF 隨機抽選成分股、查詢權重佔比與產業分類的線上工具。",
+          "applicationCategory": "FinanceApplication",
+          "operatingSystem": "Any",
+          "browserRequirements": "Requires JavaScript",
+          "isPartOf": { "@id": "__SITE_URL__/#website" },
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "TWD"
+          }
+        },
+        {
+          "@type": "ItemList",
+          "name": "DestinyOrder 主要分頁",
+          "itemListElement": [
+            {
+              "@type": "SiteNavigationElement",
+              "position": 1,
+              "name": "命定抽選",
+              "description": "隨機抽出一檔 ETF 成分股",
+              "url": "__SITE_URL__/"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 2,
+              "name": "命定拉霸機",
+              "description": "三軸同框、命中三連即定一檔台股 ETF 成分股",
+              "url": "__SITE_URL__/slot"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 3,
+              "name": "成分股一覽",
+              "description": "五檔 ETF 持股對照表",
+              "url": "__SITE_URL__/holdings"
+            },
+            {
+              "@type": "SiteNavigationElement",
+              "position": 4,
+              "name": "權重查詢",
+              "description": "依 ETF 查詢成分股權重",
+              "url": "__SITE_URL__/weights"
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
