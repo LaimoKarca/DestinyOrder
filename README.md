@@ -2,7 +2,6 @@
 
 **DestinyOrder** 是一個結合台股被動市值型與主動式 ETF 成分股候選池的隨機抽選與權重檢視工具。透過「命定抽抽樂」與「命定拉霸機」兩種互動介面，協助研究人員與一般觀察者跳脫單一選股確認偏誤，快速檢視五檔台股代表性 ETF（`0050`、`006208`、`009816`、`00403A`、`00981A`）的共同持股、產業分布與權重結構。
 
-- **專案預計公開儲存庫**：<https://github.com/LaimoKarca/DestinyOrder.git>
 - **問題回報與功能建議**：<https://github.com/LaimoKarca/DestinyOrder/issues>
 - **開源授權條款**：本版本庫公開之自有原創內容採用 [**MIT License**](./LICENSE)（`Copyright (c) 2026 LaimoKarca`）；第三方圖示、鷹架與相依套件保留其各自原始授權條款，金融資料與已排除之本機資產限制請參閱 [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md)。
 
