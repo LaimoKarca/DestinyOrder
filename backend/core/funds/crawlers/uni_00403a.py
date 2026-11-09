@@ -1,10 +1,11 @@
-# -*- coding: utf-8-sig -*-
-"""統一投信 主動統一升級 50（00403A）爬蟲。
+# -*- coding: utf-8 -*-
+"""00403A (主動統一升級50): validated official equity portfolio crawler.
 
-來源：ezmoney.com.tw fundCode=63YTW。基本資料頁讀取持股與資料日期，
-切換至「淨值走勢」頁籤後讀取最新淨值與漲跌幅。
+The official investment portfolio includes summary tables and potentially
+non-equity positions. Select the equity table by its column headings, not by
+absolute XPath or a table's ordinal position.
 """
-
+import re
 from typing import Final
 
 from playwright.sync_api import Page, TimeoutError as PlaywrightTimeoutError
@@ -22,152 +23,136 @@ logger = get_logger(__name__)
 
 CODE: Final[str] = "00403A"
 NAME: Final[str] = "主動統一升級50"
-URL: Final[str] = (
-    "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=63YTW&tabName=basic#"
-)
-
-_TAB_SELECTOR: Final[str] = "a[data-toggle='tab'][href='#value']"
-_HOLDINGS_TABLE_FEATURES: Final[tuple[str, ...]] = (
-    "table:has-text('名稱'):has-text('權重')",
-    "table:has-text('品名'):has-text('比例')",
-)
-_NAME_HEADER_TOKENS: Final[frozenset[str]] = frozenset({"名稱", "型態"})
-_FALLBACK_NAME_XPATH_TPL: Final[str] = (
-    "/html/body/div[1]/div/div[2]/div[7]/div[2]/div/div[3]/div/div[2]/table[4]"
-    "/tbody/tr[{idx}]/td[2]/span"
-)
-_FALLBACK_WEIGHT_XPATH_TPL: Final[str] = (
-    "/html/body/div[1]/div/div[2]/div[7]/div[2]/div/div[3]/div/div[2]/table[4]"
-    "/tbody/tr[{idx}]/td[4]/span"
-)
-_FALLBACK_ROW_START: Final[int] = 3
-_FALLBACK_ROW_END: Final[int] = 52
+URL: Final[str] = "https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=63YTW"
+_STOCK_HEADERS: Final[tuple[str, ...]] = ("股票代號", "股票名稱", "持股權重")
+_WEIGHT_PATTERN: Final[re.Pattern[str]] = re.compile(r"^\d+(?:\.\d+)?\s*%$")
+_STOCK_CODE_PATTERN: Final[re.Pattern[str]] = re.compile(r"^[0-9A-Za-z]{4,8}$")
+_MIN_STOCKS: Final[int] = 15
 
 
-def _locate_holdings_table(page: Page):
-    """依序以特徵選擇器尋找持股表，找到即回傳；皆無回 None。"""
-    for selector in _HOLDINGS_TABLE_FEATURES:
-        target = page.locator(selector).first
-        if target.count() > 0:
-            return target
-    return None
+def _parse_stock_rows(rows: list[list[str]]) -> list[Holding] | None:
+    """Parse a stock table, returning None for non-stock tables."""
+    header_row = -1
+    columns: dict[str, int] = {}
+    for i, row in enumerate(rows[:4]):
+        normalized = ["".join(cell.split()) for cell in row]
+        if all(header in normalized for header in _STOCK_HEADERS):
+            header_row = i
+            columns = {header: normalized.index(header) for header in _STOCK_HEADERS}
+            break
+    if header_row < 0:
+        return None
 
-
-def _extract_holdings_primary(page: Page) -> list[Holding]:
-    """優先路徑：以特徵定位持股表並讀取每一列。"""
-    table = _locate_holdings_table(page)
-    if table is None:
-        return []
-
-    try:
-        table.locator("tr").first.wait_for(state="attached", timeout=5000)
-    except PlaywrightTimeoutError:
-        logger.warning("Holdings table rows not attached.")
-        return []
-
-    holdings: list[Holding] = []
-    rows = table.locator("tr")
-    for i in range(rows.count()):
-        cells = rows.nth(i).locator("td")
-        if cells.count() < 4:
+    stocks: list[Holding] = []
+    seen: set[str] = set()
+    for cells in rows[header_row + 1:]:
+        if len(cells) <= max(columns.values()):
             continue
-        name_text = cells.nth(1).text_content().strip()
-        weight_text = cells.nth(3).text_content().strip()
-        is_header = any(token in name_text for token in _NAME_HEADER_TOKENS)
-        if not name_text or is_header:
+        code = cells[columns["股票代號"]].strip()
+        name = cells[columns["股票名稱"]].strip()
+        weight = cells[columns["持股權重"]].strip()
+        if not code and not name:
             continue
-        holdings.append(Holding(name=name_text, weight=format_weight(weight_text)))
-    return holdings
+        if not _STOCK_CODE_PATTERN.fullmatch(code) or not name:
+            raise ValueError(f"00403A invalid stock identifier: {code!r}, {name!r}")
+        if not _WEIGHT_PATTERN.fullmatch(weight):
+            raise ValueError(f"00403A invalid weight for stock {code}: {weight!r}")
+        if code in seen:
+            raise ValueError(f"00403A duplicate stock identifier: {code}")
+        seen.add(code)
+        stocks.append(Holding(name=name, weight=format_weight(weight)))
+    return stocks
 
 
-def _extract_holdings_fallback(page: Page) -> list[Holding]:
-    """備援路徑：以絕對 XPath 擷取。"""
-    holdings: list[Holding] = []
-    for idx in range(_FALLBACK_ROW_START, _FALLBACK_ROW_END + 1):
-        name_elem = page.locator(
-            f"xpath={_FALLBACK_NAME_XPATH_TPL.format(idx=idx)}"
-        )
-        weight_elem = page.locator(
-            f"xpath={_FALLBACK_WEIGHT_XPATH_TPL.format(idx=idx)}"
-        )
-        if name_elem.count() == 0 or weight_elem.count() == 0:
-            continue
-        name_text = name_elem.text_content().strip()
-        if not name_text:
-            continue
-        holdings.append(
-            Holding(
-                name=name_text,
-                weight=format_weight(weight_elem.text_content().strip()),
-            )
-        )
-    return holdings
+def _validate_holdings(holdings: list[Holding]) -> float:
+    """Reject truncated, non-equity, and impossible snapshots before writing."""
+    if len(holdings) < _MIN_STOCKS:
+        raise ValueError(f"00403A incomplete holdings: {len(holdings)} stocks")
+    values = [float(item.weight.rstrip("%")) for item in holdings]
+    if any(value < 0 or value > 100 for value in values):
+        raise ValueError("00403A contains negative or impossible weights")
+    total = sum(values)
+    if not 20 <= total <= 102:
+        raise ValueError(f"00403A implausible equity total: {total:.2f}%")
+    return total
 
 
 def _extract_holdings(page: Page) -> list[Holding]:
-    """先試特徵定位，全空時退回絕對 XPath。"""
-    primary = _extract_holdings_primary(page)
-    if primary:
-        return primary
-    logger.info("Primary holdings extraction empty; using XPath fallback.")
-    return _extract_holdings_fallback(page)
+    """Find stock details by exact column headings in #assetBody."""
+    tables = page.locator("#assetBody table")
+    for i in range(tables.count()):
+        rows = tables.nth(i).locator("tr").evaluate_all(
+            "(trs) => trs.map(tr => Array.from(tr.querySelectorAll('th,td'),"
+            " cell => (cell.textContent || '').trim()))"
+        )
+        holdings = _parse_stock_rows(rows)
+        if holdings is not None:
+            total = _validate_holdings(holdings)
+            logger.info(
+                "00403A official equity table validated: %s stocks, %.2f%% total",
+                len(holdings), total,
+            )
+            return holdings
+    raise ValueError("00403A official equity holdings table not found")
 
 
 def _switch_to_value_tab(page: Page) -> bool:
-    """以 dispatch_event 觸發頁籤切換，避免捲動卡死。"""
     try:
-        tab_btn = page.wait_for_selector(_TAB_SELECTOR, state="visible", timeout=5000)
-        if not tab_btn:
+        tab = page.locator("a[data-toggle='tab'][href='#value']").first
+        if not tab.count():
             return False
-        tab_btn.scroll_into_view_if_needed()
-        tab_btn.dispatch_event("click")
-        page.wait_for_timeout(2000)
+        tab.evaluate("(element) => element.click()")
+        page.wait_for_timeout(1200)
         return True
     except Exception as exc:
-        logger.warning("Switch tab failed: %s", exc)
+        logger.warning("00403A NAV tab switch failed: %s", exc)
         return False
 
 
-def fetch() -> StockPriceSnapshot | None:
-    """執行 00403A 爬蟲流程。"""
+def _fetch_once() -> StockPriceSnapshot:
     with headless_page() as page:
-        logger.info("Loading %s", URL)
-        try:
-            page.goto(URL, wait_until="networkidle", timeout=30000)
-        except PlaywrightTimeoutError:
-            logger.warning("Page load timeout.")
-            return None
+        response = page.goto(URL, wait_until="domcontentloaded", timeout=30000)
+        if response is not None and response.status >= 400:
+            raise RuntimeError(f"00403A official source HTTP {response.status}")
 
-        update_time = extract_date_from_label(page)
+        # Avoid networkidle: analytics or background requests need not settle.
+        # Wait for the actual stock table, including a reasonable row count.
+        page.wait_for_function(
+            """() => Array.from(document.querySelectorAll('#assetBody table'))
+                .some(t => {
+                    const rows = t.querySelectorAll('tr');
+                    const hasStockHeader = Array.from(rows).slice(0, 4)
+                        .some(r => ['股票代號', '股票名稱', '持股權重']
+                            .every(label => (r.textContent || '').includes(label)));
+                    return rows.length >= 17 && hasStockHeader;
+                })""",
+            timeout=20000,
+        )
+
         holdings = _extract_holdings(page)
-
-        if not _switch_to_value_tab(page):
-            return StockPriceSnapshot(
-                code=CODE,
-                name=NAME,
-                nav="未取得",
-                change_percent="未取得",
-                update_time=update_time,
-                holdings=holdings,
-            )
-
-        nav_text, change_text = extract_nav_from_value_tab(page)
-
+        update_time = extract_date_from_label(page)
+        nav, change = "未取得", "未取得"
+        if _switch_to_value_tab(page):
+            nav, change = extract_nav_from_value_tab(page)
     return StockPriceSnapshot(
-        code=CODE,
-        name=NAME,
-        nav=nav_text,
-        change_percent=change_text,
-        update_time=update_time,
-        holdings=holdings,
+        code=CODE, name=NAME, nav=nav, change_percent=change,
+        update_time=update_time, holdings=holdings,
     )
 
 
-if __name__ == "__main__":
-    # 單獨執行此爬蟲（偵錯 / 單元測試 / 維護用）。
-    # 於專案根目錄 (DestinyOrder/) 執行：
-    #     python -m backend.core.funds.crawlers.uni_00403a
-    # JSON 結果輸出到 stdout、log 輸出到 stderr。
-    from backend.core.funds._dev_runner import run_crawler_standalone
+def fetch() -> StockPriceSnapshot | None:
+    """Retry one transient timeout; reject invalid data without publishing."""
+    logger.info("Loading %s", URL)
+    for attempt in (1, 2):
+        try:
+            return _fetch_once()
+        except PlaywrightTimeoutError:
+            logger.warning(
+                "00403A official stock table timed out (attempt %s/2)", attempt
+            )
+    return None
 
+
+if __name__ == "__main__":
+    from backend.core.funds._dev_runner import run_crawler_standalone
     run_crawler_standalone(fetch, CODE)
